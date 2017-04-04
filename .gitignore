@@ -91,9 +91,10 @@ ENV/
 # pycharm
 .idea/
 
-#data
+# data
 *.jpg
 *.npy
+*.dat
 
-#cache
-*～
+# cache
+*~

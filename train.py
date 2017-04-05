@@ -32,7 +32,7 @@ tf.app.flags.DEFINE_integer('max_epoch', 40,
                             """Number of epoch to run.""")
 
 # regular method
-tf.app.flags.DEFINE_float('weight_decay', 0.0004,
+tf.app.flags.DEFINE_float('weight_decay', 0.0007,
                           'The weight decay on the model weights.')
 tf.app.flags.DEFINE_float('label_smoothing', 0.0,
                           """The amount of label smoothing.""")

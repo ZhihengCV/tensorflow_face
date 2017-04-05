@@ -80,6 +80,8 @@ def _add_to_tfrecord(image_dir, train_writer, val_writer, max_cache = 100000):
                 train_im_label_list.append((_image_in_bytes(img_path), label))
                 train_count += 1
                 cache_count += 1
+            img_path = os.path.join(parent, img_filenames[-1])
+            print(img_path, label)
             val_im_label_list.append((_image_in_bytes(img_path), label))
             val_count += 1
         if cache_count > max_cache:

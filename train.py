@@ -13,6 +13,7 @@ from models import model_map
 from dataset import data_map
 from input_pipline import train_inputs
 import tensorflow as tf
+import numpy as np
 
 
 FLAGS = tf.app.flags.FLAGS
@@ -217,6 +218,8 @@ def train():
         with tf.device(FLAGS.device):
             train_logits = model.training_inference(train_images, num_classes)
             train_loss = model.loss(train_logits, train_labels)
+            top_1_op = tf.nn.in_top_k(train_logits, train_labels, 1)
+            top_5_op = tf.nn.in_top_k(train_logits, train_labels, 5)
             # Gather update_ops from the first clone. These contain, for example,
             # the updates for the batch_norm variables created by network_fn.
             update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
@@ -269,33 +272,50 @@ def train():
         num_examples_per_step = FLAGS.batch_size
 
         epoch = step * num_examples_per_step // num_per_epoch
+        top_1_count = 0
+        top_5_count = 0
+        total_sample_count = 100 * num_examples_per_step
         while epoch < FLAGS.max_epoch:
             start_time = time.time()
 
             if step % 100 == 0 and step % 500 != 0:
-                loss_value, lr, _ = sess.run([train_loss, learning_rate,
-                                              train_op])
+                loss_value, lr, top_1, top_5, _ = sess.run([train_loss, learning_rate,
+                                                            top_1_op, top_5_op, train_op])
+                top_1_count += np.sum(top_1)
+                top_5_count += np.sum(top_5)
                 duration = time.time() - start_time
                 examples_per_sec = num_examples_per_step / duration
                 sec_per_batch = float(duration)
-                format_str = ('%s: step %d epoch %d, loss = %.2f (%.1f examples/sec; %.3f '
-                              'sec/batch at learning rate %.6f')
-                print(format_str % (datetime.now(), step, epoch, loss_value,
+                top1_acc = top_1_count / total_sample_count
+                top5_acc = top_5_count / total_sample_count
+                top_1_count = 0
+                top_5_count = 0
+                format_str = ('%s: step %d epoch %d, loss = %.2f ,top1 acc = %.2f , top5 acc = %.2f '
+                              '(%.1f examples/sec; %.3f sec/batch at learning rate %.6f')
+                print(format_str % (datetime.now(), step, epoch, loss_value, top1_acc, top5_acc,
                                     examples_per_sec, sec_per_batch, lr))
             elif step % 500 == 0:
                 # summary option is time consuming
-                loss_value, lr, summary_str, _ = sess.run([train_loss, learning_rate,
-                                                           summary_op, train_op])
+                loss_value, lr, summary_str, top_1, top_5, _ = sess.run([train_loss, learning_rate, summary_op,
+                                                                         top_1_op, top_5_op, train_op])
+                top_1_count += np.sum(top_1)
+                top_5_count += np.sum(top_5)
                 duration = time.time() - start_time
                 examples_per_sec = num_examples_per_step / duration
                 sec_per_batch = float(duration)
-                format_str = ('%s: step %d epoch %d, loss = %.2f (%.1f examples/sec; %.3f '
-                              'sec/batch at learning rate %.6f')
-                print(format_str % (datetime.now(), step, epoch, loss_value,
+                top1_acc = top_1_count / total_sample_count
+                top5_acc = top_5_count / total_sample_count
+                top_1_count = 0
+                top_5_count = 0
+                format_str = ('%s: step %d epoch %d, loss = %.2f ,top1 acc = %.2f , top5 acc = %.2f '
+                              '(%.1f examples/sec; %.3f sec/batch at learning rate %.6f')
+                print(format_str % (datetime.now(), step, epoch, loss_value, top1_acc, top5_acc,
                                     examples_per_sec, sec_per_batch, lr))
                 summary_writer.add_summary(summary_str, step)
             else:
-                _ = sess.run([train_op])
+                _, top_1, top_5 = sess.run([train_op, top_1_op, top_5_op])
+                top_1_count += np.sum(top_1)
+                top_5_count += np.sum(top_5)
             # Save the model checkpoint periodically and do eval.
             if step % FLAGS.save_step == 0 or (step + 1) // num_per_epoch == FLAGS.max_epoch:
                 checkpoint_path = os.path.join(FLAGS.train_dir,

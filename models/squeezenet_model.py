@@ -2,6 +2,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from tensorflow.contrib.layers.python.layers import utils
+from tensorflow.contrib.framework.python.ops import add_arg_scope
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 
@@ -12,117 +14,77 @@ FLAGS = tf.app.flags.FLAGS
 # the 'global' mean and variance for all activations.
 BATCHNORM_MOVING_AVERAGE_DECAY = 0.9997
 
-
+@add_arg_scope
 def fire_module(inputs,
                 squeeze_depth,
                 expand_depth,
-                reuse=None,
                 scope=None,
                 outputs_collections=None):
-    with tf.variable_scope(scope, 'fire', [inputs], reuse=reuse):
-        with slim.arg_scope([slim.conv2d, slim.max_pool2d],
-                            outputs_collections=None):
-            net = squeeze(inputs, squeeze_depth)
-            outputs = expand(net, expand_depth)
-            return outputs
-
-def squeeze(inputs, num_outputs):
-    return slim.conv2d(inputs, num_outputs, [1, 1], stride=1, scope='squeeze')
+    with tf.variable_scope(scope, 'fire', [inputs]) as sc:
+        squeeze = slim.conv2d(inputs, squeeze_depth, [1, 1],
+                              scope='squeeze')
+        outputs = expand(squeeze, expand_depth)
+        return utils.collect_named_outputs(outputs_collections,
+                                           sc.original_name_scope, outputs)
 
 def expand(inputs, num_outputs):
     with tf.variable_scope('expand'):
         e1x1 = slim.conv2d(inputs, num_outputs, [1, 1], stride=1, scope='1x1')
         e3x3 = slim.conv2d(inputs, num_outputs, [3, 3], scope='3x3')
-    return tf.concat([e1x1, e3x3], 3)
+    return tf.concat([e1x1, e3x3], axis=3)
 
 
-def densenet_block(inputs, layer_num, growth, bc_mode, scope, is_training, keep_prob):
-    with tf.variable_scope(scope, 'block1', [inputs]):
-        currents = inputs
-        for idx in xrange(layer_num):
-            if not bc_mode:
-                new_feature = slim.conv2d(currents, growth,
-                                          [3, 3], scope='conv_{:d}'.format(idx))
-                new_feature = slim.dropout(new_feature, keep_prob=keep_prob,
-                                           is_training=is_training,
-                                           scope='dropout_{:d}'.format(idx))
-            else:
-                new_feature = slim.conv2d(currents, growth*4,
-                                          [1, 1], scope='bottom_{:d}'.format(idx))
-                new_feature = slim.dropout(new_feature, keep_prob=keep_prob,
-                                           is_training=is_training,
-                                           scope='dropout_b_{:d}'.format(idx))
-                new_feature = slim.conv2d(new_feature, growth,
-                                          [3, 3], scope='conv_{:d}'.format(idx))
-                new_feature = slim.dropout(new_feature, keep_prob=keep_prob,
-                                           is_training=is_training,
-                                           scope='dropout_{:d}'.format(idx))
-            currents = tf.concat([currents, new_feature], axis=3)
-        return currents
 
+def squeezenet_inference(inputs, is_training, keep_prob):
+    nets = slim.conv2d(inputs, 64,
+                       [3, 3], scope='conv1')
+    nets = slim.max_pool2d(nets, [3, 3], padding='SAME', scope='pool1')  # 56*48*64
 
-def transition_block(inputs, reduction, scope, is_training, keep_prob):
-    """Call H_l composite function with 1x1 kernel and after average
-    pooling
-    """
-    with tf.variable_scope(scope, 'trans1', [inputs]):
-        # call composite function with 1x1 kernel
-        out_features = int(int(inputs.get_shape()[-1]) * reduction)
-        nets = slim.conv2d(inputs, out_features,
-                           [1, 1], scope='conv')
-        nets = slim.dropout(nets, keep_prob=keep_prob,
-                            is_training=is_training,
-                            scope='dropout')
-        # run average pooling
-        nets = slim.avg_pool2d(nets, [2, 2], scope='pool')
-        return nets
+    nets = fire_module(nets, 16, 64, scope='fire2')
 
+    nets = fire_module(nets, 16, 64, scope='fire3')
 
-def densenet_inference(inputs, is_training, keep_prob, growth_rate, reduction):
+    nets = slim.max_pool2d(nets, [3, 3], padding='SAME', scope='pool1')  # 28*24*128
 
-    first_output_fea = growth_rate * 2
+    nets = fire_module(nets, 32, 128, scope='fire4')
 
-    nets = slim.conv2d(inputs, first_output_fea,
-                       [5, 5], scope='conv0')
-    nets = slim.max_pool2d(nets, [3, 3], padding='SAME', scope='pool0')  # 56*48*64
+    nets = fire_module(nets, 32, 128, scope='fire5')
 
-    nets = densenet_block(nets, 6, growth_rate, True,
-                          'block1', is_training, keep_prob)
-    nets = transition_block(nets, reduction, 'trans1', is_training, keep_prob)  # 28*24*256
+    nets = slim.max_pool2d(nets, [3, 3], padding='SAME', scope='pool5')  # 14*12*256
 
-    nets = densenet_block(nets, 12, growth_rate, True,
-                          'block2', is_training, keep_prob)
-    nets = transition_block(nets, reduction, 'trans2', is_training, keep_prob)  # 14*12*640
+    nets = fire_module(nets, 48, 192, scope='fire6')
 
-    nets = densenet_block(nets, 24, growth_rate, True,
-                          'block3', is_training, keep_prob)
-    nets = transition_block(nets, reduction, 'trans3', is_training, keep_prob)  # 7*6*1408
+    nets = fire_module(nets, 48, 192, scope='fire7')
 
-    nets = densenet_block(nets, 16, growth_rate, True,
-                          'block4', is_training, keep_prob)  # 7*6*1920
-    nets = slim.avg_pool2d(nets, [7, 6], scope='pool4')  # 1*1*1920
+    nets = slim.max_pool2d(nets, [3, 3], padding='SAME', scope='pool6')  # 7*6*384
+
+    nets = fire_module(nets, 64, 256, scope='fire8')
+
+    nets = fire_module(nets, 64, 256, scope='fire9')  # 7*6*512
+
+    nets = slim.dropout(nets, keep_prob, is_training=is_training, scope='dropout9')
+
+    nets = slim.avg_pool2d(nets, [7, 6], scope='pool9')  # 1*1*512
+
     return nets
 
 
-def densenet_a(inputs,
+def squeezenet(inputs,
                num_classes=1000,
                is_training=True,
-               keep_prob=0.2,
-               growth_rate=32,
-               reduction=0.6,
+               keep_prob=0.5,
                spatial_squeeze=True,
-               scope='densenet_121'):
+               scope='squeeze'):
     """
-    Densenet 121-Layers version.
+    squeezenetv1.1
     """
-    with tf.name_scope(scope, 'densenet_121', [inputs]) as sc:
+    with tf.name_scope(scope, 'squeeze', [inputs]) as sc:
         end_points_collection = sc + '_end_points'
         # Collect outputs for conv2d, fully_connected and max_pool2d.
         with slim.arg_scope([slim.conv2d, slim.max_pool2d,
-                             slim.avg_pool2d],
+                             slim.avg_pool2d, fire_module],
                             outputs_collections=end_points_collection):
-
-            nets = densenet_inference(inputs, is_training, keep_prob, growth_rate, reduction)
+            nets = squeezenet_inference(inputs, is_training, keep_prob)
             nets = slim.conv2d(nets, num_classes, [1, 1],
                                activation_fn=None,
                                normalizer_fn=None,
@@ -133,7 +95,7 @@ def densenet_a(inputs,
             return nets, end_points
 
 
-def training_inference(images, num_classes, scope='densenet_121'):
+def training_inference(images, num_classes, scope='squeeze'):
     """
     Args:
         images: Images returned from inputs() or distorted_inputs().
@@ -165,10 +127,10 @@ def training_inference(images, num_classes, scope='densenet_121'):
                             activation_fn=tf.nn.relu,
                             normalizer_fn=slim.batch_norm,
                             normalizer_params=batch_norm_params):
-            logits, endpoints = densenet_a(
+            logits, endpoints = squeezenet(
                 images,
                 num_classes=num_classes,
-                keep_prob=0.2,
+                keep_prob=0.5,
                 is_training=True,
                 scope=scope
             )
@@ -229,4 +191,3 @@ def _activation_summaries(endpoints):
     with tf.name_scope('summaries'):
         for act in endpoints.values():
             _activation_summary(act)
-

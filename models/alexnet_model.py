@@ -128,7 +128,7 @@ def alexnet_v2(inputs,
             return net, end_points
 
 
-def training_inference(images, num_classes, scope='alexnet_v2'):
+def inference(images, num_classes, is_training=True, scope='alexnet_v2'):
     """Build Inception v3 model architecture.
 
      See here for reference: http://arxiv.org/abs/1512.00567
@@ -154,7 +154,7 @@ def training_inference(images, num_classes, scope='alexnet_v2'):
         # epsilon to prevent 0s in variance.
         'epsilon': 0.001,
         # calculate moving average or using exist one
-        'is_training': True
+        'is_training': is_training
     }
     # Set weight_decay for weights in Conv and FC layers.
     with arg_scope([layers.conv2d, layers.fully_connected],
@@ -168,7 +168,7 @@ def training_inference(images, num_classes, scope='alexnet_v2'):
                 images,
                 num_classes=num_classes,
                 dropout_keep_prob=0.8,
-                is_training=True,
+                is_training=is_training,
                 scope=scope
             )
 

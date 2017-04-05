@@ -216,7 +216,7 @@ def train():
         #############################
         # forward,and transfer label to onehot_labels for label smoothing
         with tf.device(FLAGS.device):
-            train_logits = model.training_inference(train_images, num_classes)
+            train_logits = model.inference(train_images, num_classes, is_training=True)
             train_loss = model.loss(train_logits, train_labels)
             top_1_op = tf.nn.in_top_k(train_logits, train_labels, 1)
             top_5_op = tf.nn.in_top_k(train_logits, train_labels, 5)

@@ -315,7 +315,7 @@ def inception_v3(inputs,
             return logits, end_points
 
 
-def training_inference(images, num_classes, scope='inception_v3'):
+def inference(images, num_classes, is_traiing=True, scope='inception_v3'):
     """Build Inception v3 model architecture.
 
      See here for reference: http://arxiv.org/abs/1512.00567
@@ -341,7 +341,7 @@ def training_inference(images, num_classes, scope='inception_v3'):
         # epsilon to prevent 0s in variance.
         'epsilon': 0.001,
         # calculate moving average or using exist one
-        'is_training': True
+        'is_training': is_traiing
     }
     # Set weight_decay for weights in Conv and FC layers.
     with slim.arg_scope([slim.conv2d, slim.fully_connected],
@@ -355,7 +355,7 @@ def training_inference(images, num_classes, scope='inception_v3'):
                 images,
                 num_classes=num_classes,
                 dropout_keep_prob=0.8,
-                is_training=True,
+                is_training=is_traiing,
                 scope=scope
             )
 

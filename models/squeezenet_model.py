@@ -95,7 +95,7 @@ def squeezenet(inputs,
             return nets, end_points
 
 
-def training_inference(images, num_classes, scope='squeeze'):
+def inference(images, num_classes, is_training=True, scope='squeeze'):
     """
     Args:
         images: Images returned from inputs() or distorted_inputs().
@@ -117,7 +117,7 @@ def training_inference(images, num_classes, scope='squeeze'):
         # epsilon to prevent 0s in variance.
         'epsilon': 0.001,
         # calculate moving average or using exist one
-        'is_training': True
+        'is_training': is_training
     }
     # Set weight_decay for weights in Conv and FC layers.
     with slim.arg_scope([slim.conv2d, slim.fully_connected],
@@ -131,7 +131,7 @@ def training_inference(images, num_classes, scope='squeeze'):
                 images,
                 num_classes=num_classes,
                 keep_prob=0.5,
-                is_training=True,
+                is_training=is_training,
                 scope=scope
             )
     # Add summaries for viewing model statistics on TensorBoard.

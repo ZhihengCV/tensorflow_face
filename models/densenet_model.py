@@ -133,7 +133,7 @@ def densenet_a(inputs,
             return nets, end_points
 
 
-def training_inference(images, num_classes, scope='densenet_121'):
+def inference(images, num_classes, is_training=True,scope='densenet_121'):
     """
     Args:
         images: Images returned from inputs() or distorted_inputs().
@@ -155,7 +155,7 @@ def training_inference(images, num_classes, scope='densenet_121'):
         # epsilon to prevent 0s in variance.
         'epsilon': 0.001,
         # calculate moving average or using exist one
-        'is_training': True
+        'is_training': is_training
     }
     # Set weight_decay for weights in Conv and FC layers.
     with slim.arg_scope([slim.conv2d, slim.fully_connected],
@@ -169,7 +169,7 @@ def training_inference(images, num_classes, scope='densenet_121'):
                 images,
                 num_classes=num_classes,
                 keep_prob=0.2,
-                is_training=True,
+                is_training=is_training,
                 scope=scope
             )
     # Add summaries for viewing model statistics on TensorBoard.

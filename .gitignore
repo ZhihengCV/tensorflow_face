@@ -96,6 +96,7 @@ ENV/
 *.npy
 *.dat
 *.txt
+*.sh
 train_result/
 test_result/
 

@@ -161,16 +161,15 @@ def _init_weight(sess):
         raise Exception("There should be only one mode")
 
     if FLAGS.fine_tune or FLAGS.resume:
-        if FLAGS.checkpoint_path:
-            assert tf.gfile.Exists(FLAGS.checkpoint_path)
-            print('Pre-trained model restored from {}'.format(FLAGS.checkpoint_path))
         exclusions = []
         if FLAGS.exclude_scopes:
             exclusions = [scope.strip()
                           for scope in FLAGS.checkpoint_exclude_scopes.split(',')]
         if FLAGS.resume:
             step = FLAGS.checkpoint_path.split('/')[-1].split('-')[-1]
+            print("resume training from step {}".format(step))
         else:
+            print("finetune")
             step = 0
             exclusions.append('global_step')
             exclusions.append('logits')
@@ -191,6 +190,7 @@ def _init_weight(sess):
         saver.restore(sess, FLAGS.checkpoint_path)
         init_op = tf.group(*[v.initializer for v in variable_to_init])
         sess.run([init_op])
+        print("finish load model")
         return int(step)
     else:
         print("train model from scratch")
@@ -272,24 +272,18 @@ def train():
         num_examples_per_step = FLAGS.batch_size
 
         epoch = step * num_examples_per_step // num_per_epoch
-        top_1_count = 0
-        top_5_count = 0
-        total_sample_count = 100 * num_examples_per_step
         while epoch < FLAGS.max_epoch:
             start_time = time.time()
 
             if step % 100 == 0 and step % 500 != 0:
                 loss_value, lr, top_1, top_5, _ = sess.run([train_loss, learning_rate,
                                                             top_1_op, top_5_op, train_op])
-                top_1_count += np.sum(top_1)
-                top_5_count += np.sum(top_5)
+
                 duration = time.time() - start_time
                 examples_per_sec = num_examples_per_step / duration
                 sec_per_batch = float(duration)
-                top1_acc = top_1_count / total_sample_count
-                top5_acc = top_5_count / total_sample_count
-                top_1_count = 0
-                top_5_count = 0
+                top1_acc = np.sum(top_1) / num_examples_per_step
+                top5_acc = np.sum(top_5) / num_examples_per_step
                 format_str = ('%s: step %d epoch %d, loss = %.2f ,top1 acc = %.2f , top5 acc = %.2f '
                               '(%.1f examples/sec; %.3f sec/batch at learning rate %.6f')
                 print(format_str % (datetime.now(), step, epoch, loss_value, top1_acc, top5_acc,
@@ -298,24 +292,18 @@ def train():
                 # summary option is time consuming
                 loss_value, lr, summary_str, top_1, top_5, _ = sess.run([train_loss, learning_rate, summary_op,
                                                                          top_1_op, top_5_op, train_op])
-                top_1_count += np.sum(top_1)
-                top_5_count += np.sum(top_5)
                 duration = time.time() - start_time
                 examples_per_sec = num_examples_per_step / duration
                 sec_per_batch = float(duration)
-                top1_acc = top_1_count / total_sample_count
-                top5_acc = top_5_count / total_sample_count
-                top_1_count = 0
-                top_5_count = 0
+                top1_acc = np.sum(top_1) / num_examples_per_step
+                top5_acc = np.sum(top_5) / num_examples_per_step
                 format_str = ('%s: step %d epoch %d, loss = %.2f ,top1 acc = %.2f , top5 acc = %.2f '
                               '(%.1f examples/sec; %.3f sec/batch at learning rate %.6f')
                 print(format_str % (datetime.now(), step, epoch, loss_value, top1_acc, top5_acc,
                                     examples_per_sec, sec_per_batch, lr))
                 summary_writer.add_summary(summary_str, step)
             else:
-                _, top_1, top_5 = sess.run([train_op, top_1_op, top_5_op])
-                top_1_count += np.sum(top_1)
-                top_5_count += np.sum(top_5)
+                _ = sess.run([train_op])
             # Save the model checkpoint periodically and do eval.
             if step % FLAGS.save_step == 0 or (step + 1) // num_per_epoch == FLAGS.max_epoch:
                 checkpoint_path = os.path.join(FLAGS.train_dir,

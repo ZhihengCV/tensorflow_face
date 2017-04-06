@@ -201,6 +201,8 @@ def eval_inputs(dataset, batch_size, num_preprocess_threads=None):
     # Force all input processing onto CPU in order to reserve the GPU for
     # the forward inference and back-propagation.
     with tf.device('/cpu:0'):
+        if not batch_size:
+            batch_size = FLAGS.batch_size
         with tf.variable_scope("val_input"):
             images, labels = batch_inputs(
                 dataset, batch_size, train=False,

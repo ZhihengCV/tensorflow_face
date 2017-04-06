@@ -144,7 +144,7 @@ def main(_):
                     for model_path in new_item:
                         global_step = model_path.split('/')[-1].split('-')[-1]
                         saver.restore(sess, model_path)
-                        eval_once(global_step, sess, val_loss, top_one_op, top_five_op)
+                        eval_once(global_step, sess, val_loss, top_one_op, top_five_op, image_num)
                     old_model_list = temp_model_list
             coord.request_stop()
             coord.join(threads)

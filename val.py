@@ -17,9 +17,9 @@ tf.app.flags.DEFINE_string(
     'model_name', 'squeezenet', 'The name of the architecture to train.')
 tf.app.flags.DEFINE_string(
     'data_name', 'webface', 'The name of the data')
-tf.app.flags.DEFINE_integer('batch_size', 32,
+tf.app.flags.DEFINE_integer('batch_size', 100,
                             """Number of images to process in a batch.""")
-tf.app.flags.DEFINE_float('weight_decay', 0.0007,
+tf.app.flags.DEFINE_float('weight_decay', 0.001,
                           'The weight decay on the model weights.')
 tf.app.flags.DEFINE_float('label_smoothing', 0.0,
                           """The amount of label smoothing.""")
@@ -28,7 +28,7 @@ tf.app.flags.DEFINE_integer('eval_interval_secs', 300,
                             """How often to run the eval.""")
 
 tf.app.flags.DEFINE_string(
-    'checkpoint_dir', './train_result/squeezenet_new',
+    'checkpoint_dir', './train_result/squeezenet',
     'The directory where the model was written to or an absolute path to a '
     'checkpoint file.')
 
@@ -36,7 +36,7 @@ tf.app.flags.DEFINE_string(
 #     'eval_dir', './single_gpu', 'Directory where the results are saved to.')
 
 tf.app.flags.DEFINE_string(
-    'eval_mode', 'online', 'offline/online/once')
+    'eval_mode', 'offline', 'offline/online/once')
 
 tf.app.flags.DEFINE_boolean('log_device_placement', False,
                             """Whether to log device placement.""")

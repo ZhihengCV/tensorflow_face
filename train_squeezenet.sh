@@ -1,1 +1,1 @@
-python train.py --model_name squeezenet --train_dir ./train_result/squeezenet_new --batch_size 128 --num_readers 2 --input_queue_memory_factor 8 --weight_decay 0.0005 --num_epochs_per_decay 15.0 --max_epoch 60
+python train.py --model_name squeezenet --train_dir ./train_result/squeezenet_new --batch_size 128 --num_readers 2 --input_queue_memory_factor 8 --weight_decay 0.001 --num_epochs_per_decay 15.0 --max_epoch 60

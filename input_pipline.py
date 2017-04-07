@@ -300,7 +300,9 @@ def batch_inputs(dataset, batch_size, train, num_preprocess_threads=None,
                 [image, label],
                 batch_size=batch_size,
                 num_threads=num_preprocess_threads,
-                capacity=min_queue_examples + 3 * batch_size)
+                capacity=min_queue_examples + 3 * batch_size,
+                min_after_dequeue=min_queue_examples
+            )
         else:
             images, label_batch = tf.train.batch(
                 [image, label],

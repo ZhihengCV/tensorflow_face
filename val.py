@@ -12,6 +12,7 @@ import numpy as np
 import time
 from datetime import datetime
 import math
+import os
 
 tf.app.flags.DEFINE_string(
     'model_name', 'squeezenet', 'The name of the architecture to train.')
@@ -32,8 +33,8 @@ tf.app.flags.DEFINE_string(
     'The directory where the model was written to or an absolute path to a '
     'checkpoint file.')
 
-# tf.app.flags.DEFINE_string(
-#     'eval_dir', './single_gpu', 'Directory where the results are saved to.')
+tf.app.flags.DEFINE_string(
+    'eval_dir', './vgg/validation', 'Directory where the results are saved to.')
 
 tf.app.flags.DEFINE_string(
     'eval_mode', 'offline', 'offline/online/once')
@@ -61,7 +62,10 @@ def eval_once(global_step, sess, val_loss, top_one_op, top_five_op, image_num):
     top_k_op: Top K op.
     summary_op: Summary op.
     """
-    print("eval model as {} steps".format(global_step))
+    log_list = []
+    log_str = "eval model @ steps %s\n" % global_step
+    log_list.append(log_str)
+    print(log_str)
 
     true_one_count = 0  # Counts the number of correct predictions.
     true_five_count = 0
@@ -79,14 +83,27 @@ def eval_once(global_step, sess, val_loss, top_one_op, top_five_op, image_num):
 
     # Compute precision @ 1 @ 5.
     loss_mean = loss_sum / iter_num
-    print('%s: val_loss = %.3f' % (datetime.now(), loss_mean))
+    log_str = '%s: val_loss = %.3f\n' % (datetime.now(), loss_mean)
+    log_list.append(log_str)
+    print(log_str)
+
     precision = 1.0 * true_one_count / total_sample_count
-    print('%s: precision @ 1 = %.3f' % (datetime.now(), precision))
+    log_str = '%s: precision @ 1 = %.3f\n' % (datetime.now(), precision)
+    log_list.append(log_str)
+    print(log_str)
+
     precision = 1.0 * true_five_count / total_sample_count
-    print('%s: precision @ 5 = %.3f' % (datetime.now(), precision))
+    log_str = '%s: precision @ 5 = %.3f\n' % (datetime.now(), precision)
+    log_list.append(log_str)
+    print(log_str)
+    return log_list
 
 
 def main(_):
+    if tf.gfile.Exists(FLAGS.eval_dir):
+        tf.gfile.DeleteRecursively(FLAGS.eval_dir)
+    tf.gfile.MakeDirs(FLAGS.eval_dir)
+
     if FLAGS.eval_mode not in ['offline', 'online', 'once']:
         raise ValueError("mode should be one of offline/online/once")
 
@@ -125,10 +142,14 @@ def main(_):
             threads = tf.train.start_queue_runners(sess=sess, coord=coord)
             if FLAGS.eval_mode == 'offline':
                 model_path_list = ckpt.all_model_checkpoint_paths
-                for model_path in model_path_list:
-                    global_step = model_path.split('/')[-1].split('-')[-1]
-                    saver.restore(sess, model_path)
-                    eval_once(global_step, sess, val_loss, top_one_op, top_five_op, image_num)
+                with open(os.path.join(FLAGS.eval_dir, 'val.log'), 'w') as f:
+                    for model_path in model_path_list:
+                        global_step = model_path.split('/')[-1].split('-')[-1]
+                        saver.restore(sess, model_path)
+                        log_list = eval_once(global_step, sess, val_loss, top_one_op, top_five_op, image_num)
+                        for log_str in log_list:
+                            f.write(log_str)
+                        f.flush()
             elif FLAGS.eval_mode == 'once':
                 model_path = ckpt.model_checkpoint_path
                 global_step = model_path.split('/')[-1].split('-')[-1]
@@ -136,16 +157,20 @@ def main(_):
                 eval_once(global_step, sess, val_loss, top_one_op, top_five_op, image_num)
             else:
                 old_model_list = []
-                while True:
-                    time.sleep(FLAGS.eval_interval_secs)
-                    ckpt = tf.train.get_checkpoint_state(FLAGS.checkpoint_dir)
-                    temp_model_list = ckpt.all_model_checkpoint_paths
-                    new_item = [i for i in temp_model_list if i not in old_model_list]
-                    for model_path in new_item:
-                        global_step = model_path.split('/')[-1].split('-')[-1]
-                        saver.restore(sess, model_path)
-                        eval_once(global_step, sess, val_loss, top_one_op, top_five_op, image_num)
-                    old_model_list = temp_model_list
+                with open(os.path.join(FLAGS.eval_dir, 'val.log'), 'w') as f:
+                    while True:
+                        time.sleep(FLAGS.eval_interval_secs)
+                        ckpt = tf.train.get_checkpoint_state(FLAGS.checkpoint_dir)
+                        temp_model_list = ckpt.all_model_checkpoint_paths
+                        new_item = [i for i in temp_model_list if i not in old_model_list]
+                        for model_path in new_item:
+                            global_step = model_path.split('/')[-1].split('-')[-1]
+                            saver.restore(sess, model_path)
+                            log_list = eval_once(global_step, sess, val_loss, top_one_op, top_five_op, image_num)
+                            for log_str in log_list:
+                                f.write(log_str)
+                            f.flush()
+                        old_model_list = temp_model_list
             coord.request_stop()
             coord.join(threads)
             sess.close()

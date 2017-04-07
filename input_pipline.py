@@ -291,18 +291,22 @@ def batch_inputs(dataset, batch_size, train, num_preprocess_threads=None,
                 reader = dataset.reader()
                 _, example_serialized = reader.read(filename_queue)
 
-        images_and_labels = []
-        for thread_id in range(num_preprocess_threads):
-            # Parse a serialized Example proto to extract the image and metadata.
-            image, label = parse_example_proto(example_serialized)
-            image = image_preprocessing(image, train)
-            image.set_shape([dataset.height, dataset.width, dataset.depth])
-            images_and_labels.append([image, label])
+        image, label = parse_example_proto(example_serialized)
+        image = image_preprocessing(image, train)
+        image.set_shape([dataset.height, dataset.width, dataset.depth])
 
-        images, label_batch = tf.train.batch_join(
-            images_and_labels,
-            batch_size=batch_size,
-            capacity=2 * num_preprocess_threads * batch_size)
+        if train:
+            images, label_batch = tf.train.shuffle_batch(
+                [image, label],
+                batch_size=batch_size,
+                num_threads=num_preprocess_threads,
+                capacity=min_queue_examples + 3 * batch_size)
+        else:
+            images, label_batch = tf.train.batch(
+                [image, label],
+                batch_size=batch_size,
+                num_threads=num_preprocess_threads,
+                capacity=min_queue_examples + 3 * batch_size)
 
         # Reshape images into these desired dimensions.
         height = FLAGS.image_height

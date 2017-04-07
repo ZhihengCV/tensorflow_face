@@ -116,6 +116,7 @@ def run(dataset_dir, image_dir):
     val_writer = tf.python_io.TFRecordWriter(val_filename)
     id_count, train_count, val_count = _add_to_tfrecord(image_dir, train_writer, val_writer)
     train_writer.close()
+    val_writer.close()
     with open(os.path.join(dataset_dir, 'casia_clean_disc.txt'), 'w') as f:
         f.write("casia clean version, rotate only crop method, size 96*112*3\n")
         f.write("There are {} ids in the dataset\n".format(id_count))
